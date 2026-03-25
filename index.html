@@ -23,11 +23,16 @@
             --success: #10b981;
         }
 
-        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-main); color: var(--text-main); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        body { 
+            margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; 
+            background-color: var(--bg-main); color: var(--text-main); 
+            /* ลบ overflow: hidden ออกเพื่อให้มือถือ/iPad เลื่อนจอได้ */
+            display: flex; flex-direction: column; min-height: 100vh; 
+        }
         
         .header { height: 50px; display: flex; align-items: center; padding: 0 20px; border-bottom: 1px solid var(--border); font-weight: bold; color: var(--accent-orange); flex-shrink: 0; letter-spacing: 0.5px; }
         
-        .dashboard-wrapper { display: flex; flex: 1; overflow: hidden; }
+        .dashboard-wrapper { display: flex; flex: 1; flex-direction: row; }
         
         /* Sidebar (Controls) */
         .sidebar { width: 340px; background-color: var(--bg-card); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0; padding: 15px; gap: 15px; }
@@ -57,20 +62,20 @@
 
         /* Main Workspace */
         .main-view { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; padding: 12px; gap: 12px; }
-        .top-row { display: flex; flex: 2; gap: 12px; min-height: 350px; }
+        .top-row { display: flex; flex: 2; gap: 12px; min-height: 400px; flex-direction: row; }
         
         /* 3D Viewport */
-        .viewport-section { flex: 2; position: relative; background: #000; border-radius: 8px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .viewport-section { flex: 2; position: relative; background: #000; border-radius: 8px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.3); min-height: 300px;}
         #canvas-container { width: 100%; height: 100%; outline: none; }
         
         /* Map Area */
-        .map-section { flex: 1; border-radius: 8px; border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; background: var(--bg-card); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .map-section { flex: 1; border-radius: 8px; border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; background: var(--bg-card); box-shadow: 0 4px 6px rgba(0,0,0,0.3); min-height: 200px;}
         #map { flex: 1; width: 100%; background: #0f172a; }
         .leaflet-layer, .leaflet-control-zoom-in, .leaflet-control-zoom-out, .leaflet-control-attribution { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
         
         /* Chart Area */
         .chart-section { flex: 1; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); padding: 15px; min-height: 250px; display: flex; flex-direction: column; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .chart-wrapper { flex: 1; position: relative; }
+        .chart-wrapper { flex: 1; position: relative; min-height: 200px; }
 
         /* HUDs on 3D */
         .model-tag { position: absolute; top: 15px; left: 15px; background: rgba(15, 23, 42, 0.85); padding: 8px 12px; border-radius: 6px; font-size: 11px; color: var(--text-main); border: 1px solid var(--border); pointer-events: none; backdrop-filter: blur(4px); }
@@ -80,6 +85,20 @@
         #compass-s { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); color: #94a3b8; }
         #compass-e { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
         #compass-w { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+
+        /* ========================================= */
+        /* RESPONSIVE DESIGN FOR IPAD & MOBILE       */
+        /* ========================================= */
+        @media (max-width: 900px) {
+            body { overflow-y: auto; } /* อนุญาตให้เลื่อนขึ้นลงได้ */
+            .dashboard-wrapper { flex-direction: column; overflow: visible; }
+            .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); overflow-y: visible; padding-bottom: 20px;}
+            .main-view { overflow: visible; }
+            .top-row { flex-direction: column; } /* ให้ 3D และแผนที่เรียงต่อกันแนวตั้ง */
+            .viewport-section { height: 400px; flex: none; }
+            .map-section { height: 300px; flex: none; }
+            .chart-section { height: 350px; flex: none; }
+        }
     </style>
 </head>
 <body>
@@ -319,7 +338,7 @@
         sunLight.shadow.mapSize.height = 1024;
         scene.add(sunLight);
 
-        // Ground setup - เปลี่ยนสีพื้นเป็นสีเขียวอ่อนและปรับกริด
+        // Ground setup
         const groundMat = new THREE.MeshStandardMaterial({
             color: 0xa8e6cf, // Light Green color
             roughness: 0.9,
@@ -329,9 +348,9 @@
         ground.rotation.x = -Math.PI/2; ground.receiveShadow = true;
         scene.add(ground);
         
-        // Grid Helper - เปลี่ยนสีให้กลมกลืนกับพื้นเขียวอ่อน
+        // Grid Helper
         const gridHelper = new THREE.GridHelper(30, 30, 0x059669, 0x6ee7b7);
-        gridHelper.position.y = 0.01; // ยกขึ้นนิดหน่อยเพื่อไม่ให้จมกับพื้น
+        gridHelper.position.y = 0.01;
         scene.add(gridHelper);
 
         // Panel Generator
