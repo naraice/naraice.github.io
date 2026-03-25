@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SolarTrack Pro | Ultimate Simulator</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        :root {
+            --bg-main: #0f172a;
+            --bg-card: #1e293b;
+            --accent-blue: #3b82f6;
+            --accent-orange: #f59e0b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #10b981;
+        }
+
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-main); color: var(--text-main); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        .header { height: 50px; display: flex; align-items: center; padding: 0 20px; border-bottom: 1px solid var(--border); font-weight: bold; color: var(--accent-orange); flex-shrink: 0; letter-spacing: 0.5px; }
+        
+        .dashboard-wrapper { display: flex; flex: 1; overflow: hidden; }
+        
+        /* Sidebar (Controls) */
+        .sidebar { width: 340px; background-color: var(--bg-card); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0; padding: 15px; gap: 15px; }
+        .card-header { font-size: 12px; font-weight: bold; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; display: block; border-left: 3px solid var(--accent-orange); padding-left: 8px; }
+        .control-group { margin-bottom: 10px; }
+        .label-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; align-items: center; }
+        .val-hl { font-weight: bold; color: var(--accent-blue); }
+        input[type=range] { width: 100%; cursor: pointer; accent-color: var(--accent-blue); margin-bottom: 8px; }
+        
+        /* Location Tag */
+        .location-tag { font-size: 12px; color: var(--success); margin-bottom: 15px; display: flex; align-items: flex-start; gap: 6px; background: rgba(16, 185, 129, 0.1); padding: 10px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.2); line-height: 1.4; }
+        
+        /* Smart Toggle */
+        .smart-toggle { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; cursor: pointer; color: var(--text-main); background: rgba(59, 130, 246, 0.1); padding: 12px; border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.3); margin-bottom: 5px; transition: background 0.2s; line-height: 1.4;}
+        .smart-toggle:hover { background: rgba(59, 130, 246, 0.2); }
+        .smart-toggle input { width: 16px; height: 16px; cursor: pointer; margin: 0; margin-top: 2px; }
+
+        /* Data Grids */
+        .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(0,0,0,0.15); padding: 12px; border-radius: 6px; border: 1px solid var(--border); }
+        .data-item { font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px; }
+        .data-val { font-size: 14px; font-weight: bold; color: var(--text-main); }
+        
+        .power-box { background: rgba(0,0,0,0.2); padding: 12px; border-radius: 6px; border: 1px solid var(--border); }
+        .power-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 12px; }
+        .power-row:last-child { margin-bottom: 0; }
+        .power-val { font-size: 15px; font-weight: bold; font-family: monospace; }
+
+        /* Main Workspace */
+        .main-view { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; padding: 12px; gap: 12px; }
+        .top-row { display: flex; flex: 2; gap: 12px; min-height: 350px; }
+        
+        /* 3D Viewport */
+        .viewport-section { flex: 2; position: relative; background: #000; border-radius: 8px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        #canvas-container { width: 100%; height: 100%; outline: none; }
+        
+        /* Map Area */
+        .map-section { flex: 1; border-radius: 8px; border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; background: var(--bg-card); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        #map { flex: 1; width: 100%; background: #0f172a; }
+        .leaflet-layer, .leaflet-control-zoom-in, .leaflet-control-zoom-out, .leaflet-control-attribution { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+        
+        /* Chart Area */
+        .chart-section { flex: 1; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); padding: 15px; min-height: 250px; display: flex; flex-direction: column; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .chart-wrapper { flex: 1; position: relative; }
+
+        /* HUDs on 3D */
+        .model-tag { position: absolute; top: 15px; left: 15px; background: rgba(15, 23, 42, 0.85); padding: 8px 12px; border-radius: 6px; font-size: 11px; color: var(--text-main); border: 1px solid var(--border); pointer-events: none; backdrop-filter: blur(4px); }
+        
+        #compass-hud { position: absolute; bottom: 15px; right: 15px; width: 60px; height: 60px; border-radius: 50%; background: rgba(15, 23, 42, 0.85); border: 2px solid var(--border); font-size: 12px; font-weight: bold; pointer-events: none; z-index: 10; backdrop-filter: blur(4px); }
+        #compass-n { position: absolute; top: 2px; left: 50%; transform: translateX(-50%); color: #ef4444; }
+        #compass-s { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); color: #94a3b8; }
+        #compass-e { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+        #compass-w { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+    </style>
+</head>
+<body>
+
+    <div class="header">☀️ SolarTrack Pro | Advanced AM & Tracking Simulator</div>
+
+    <div class="dashboard-wrapper">
+        <div class="sidebar">
+            
+            <div class="control-group">
+                <span class="card-header">1. Location & Time</span>
+                <div class="location-tag">
+                    <span style="font-size: 16px;">📍</span> 
+                    <div>
+                        <div style="font-weight:bold; color:var(--text-main);">Current Location</div>
+                        <div id="val-location-name">กำลังระบุตำแหน่ง...</div>
+                    </div>
+                </div>
+
+                <div class="label-row"><span>Latitude (φ)</span> <span class="val-hl" id="val-lat">13.75°</span></div>
+                <input type="range" id="slide-lat" min="-90" max="90" step="0.1" value="13.75">
+                
+                <div class="label-row" style="margin-top:5px;"><span>Longitude (λ)</span> <span class="val-hl" id="val-lon">100.50°</span></div>
+                <input type="range" id="slide-lon" min="-180" max="180" step="0.1" value="100.5">
+
+                <div class="label-row" style="margin-top:15px;"><span>เวลา (Time of Day)</span> <span class="val-hl" id="val-time">12:00</span></div>
+                <input type="range" id="slide-time" min="0" max="23.99" step="0.1" value="12">
+                
+                <div class="label-row" style="margin-top:5px;"><span>วัน (Day of Year)</span> <span class="val-hl" id="val-day">81</span></div>
+                <input type="range" id="slide-day" min="1" max="365" step="1" value="81">
+            </div>
+
+            <div class="control-group">
+                <span class="card-header">2. System Configuration</span>
+                <label class="smart-toggle">
+                    <input type="checkbox" id="toggle-smart-fixed" checked>
+                    <div>
+                        <b>Smart Fixed Module</b><br>
+                        <span style="color: var(--text-muted);">ปรับทิศ (N/S) และมุมเอียง (Tilt) ของแผง Fixed อัตโนมัติตามซีกโลกและละติจูดปัจจุบัน (หากปิดจะใช้ค่ามาตรฐานไทยเสมอ)</span>
+                    </div>
+                </label>
+            </div>
+
+            <div class="control-group">
+                <span class="card-header">3. Environmental Data</span>
+                <div class="data-grid">
+                    <div>
+                        <span class="data-item">Sun Altitude (α)</span>
+                        <span class="data-val" id="val-alt">0.0°</span>
+                    </div>
+                    <div>
+                        <span class="data-item">Sun Azimuth (ψ)</span>
+                        <span class="data-val" id="val-az">0.0°</span>
+                    </div>
+                    <div style="grid-column: span 2; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
+                        <span class="data-item">Direct Normal Irradiance (DNI) via Air Mass</span>
+                        <span class="data-val" id="val-dni" style="color: #fde047;">0.0 W/m²</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <span class="card-header">4. Real-time Output</span>
+                
+                <div class="power-box" style="margin-bottom: 10px;">
+                    <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">Instant Power (W/m²)</div>
+                    <div class="power-row">
+                        <span style="color:var(--accent-blue)" id="label-p-static">🟦 Fixed</span> 
+                        <span class="power-val" id="val-p-static" style="color:var(--accent-blue);">0 W</span>
+                    </div>
+                    <div class="power-row">
+                        <span style="color:var(--accent-orange)">🟨 Tracker (N-S)</span> 
+                        <span class="power-val" id="val-p-track" style="color:var(--accent-orange);">0 W</span>
+                    </div>
+                </div>
+
+                <div class="power-box" style="border-color: rgba(16, 185, 129, 0.4);">
+                    <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">Daily Energy Yield (Wh/m²)</div>
+                    <div class="power-row">
+                        <span style="color:var(--accent-blue)">🟦 Fixed</span> 
+                        <span class="power-val" id="val-e-static">0 Wh</span>
+                    </div>
+                    <div class="power-row">
+                        <span style="color:var(--accent-orange)">🟨 Tracker</span> 
+                        <span class="power-val" id="val-e-track">0 Wh</span>
+                    </div>
+                    <div class="power-row" style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(16, 185, 129, 0.3);">
+                        <span style="color:var(--success)">📈 Efficiency Gain</span> 
+                        <span class="power-val" id="val-gain" style="color:var(--success); font-size: 16px;">0%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-view">
+            <div class="top-row">
+                <div class="viewport-section">
+                    <div id="canvas-container"></div>
+                    <div class="model-tag" id="tag-models">
+                        <span style="color:var(--accent-blue)" id="tag-fixed">🟦 Fixed</span> vs <span style="color:var(--accent-orange)">🟨 Single-Axis</span>
+                    </div>
+                    <div id="compass-hud">
+                        <div id="compass-n">N</div>
+                        <div id="compass-s">S</div>
+                        <div id="compass-e">E</div>
+                        <div id="compass-w">W</div>
+                    </div>
+                </div>
+
+                <div class="map-section">
+                    <div style="padding: 10px 15px; font-size: 11px; font-weight: bold; color: var(--text-muted); text-transform: uppercase; background: var(--bg-card); border-bottom: 1px solid var(--border);">
+                        🌍 Map Selector (Click to change location)
+                    </div>
+                    <div id="map"></div>
+                </div>
+            </div>
+            
+            <div class="chart-section">
+                <div style="font-size: 12px; font-weight: bold; color: var(--text-muted); margin-bottom: 10px; text-transform: uppercase;">
+                    Performance Comparison (Daily Curve)
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="powerChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 0. API & Location Handling
+        // ==========================================
+        async function fetchLocationName(lat, lon) {
+            const locLabel = document.getElementById('val-location-name');
+            locLabel.innerText = "Searching area...";
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&accept-language=th,en`);
+                const data = await response.json();
+                if (data && data.address) {
+                    const city = data.address.city || data.address.town || data.address.village || data.address.county || data.address.state || "Remote Area";
+                    const country = data.address.country || "";
+                    locLabel.innerText = `${city}, ${country}`;
+                } else {
+                    locLabel.innerText = "Ocean or Unmapped Area";
+                }
+            } catch (error) {
+                locLabel.innerText = "Location API Unavailable";
+            }
+        }
+
+        // ==========================================
+        // 1. Leaflet Map Engine
+        // ==========================================
+        const map = L.map('map').setView([13.75, 100.5], 4);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM', maxZoom: 18 }).addTo(map);
+        const marker = L.marker([13.75, 100.5]).addTo(map);
+
+        map.on('click', function(e) {
+            document.getElementById('slide-lat').value = e.latlng.lat;
+            document.getElementById('slide-lon').value = e.latlng.lng;
+            updateSystem(); 
+            fetchLocationName(e.latlng.lat, e.latlng.lng);
+        });
+
+        // Init location
+        fetchLocationName(13.75, 100.5);
+
+        // ==========================================
+        // 2. Solar Math & Atmospheric Physics
+        // ==========================================
+        Math.radians = deg => deg * Math.PI / 180;
+        Math.degrees = rad => rad * 180 / Math.PI;
+
+        const FIXED_TILT_THAI = 15, FIXED_AZ_THAI = 180;
+
+        function calcSolar(lat, lon, day, hour) {
+            const phi = Math.radians(lat);
+            const timezone = Math.round(lon / 15);
+            const lstm = 15 * timezone;
+            const B = (360 / 365) * (day - 81);
+            const eot = 9.87 * Math.sin(Math.radians(2*B)) - 7.53 * Math.cos(Math.radians(B)) - 1.5 * Math.sin(Math.radians(B));
+            const tc = 4 * (lon - lstm) + eot;
+            const lst = hour + (tc / 60);
+            const hra_deg = 15 * (lst - 12);
+            const dec_deg = -23.45 * Math.cos(Math.radians((360 / 365) * (day + 10)));
+            const sin_alt = Math.sin(Math.radians(dec_deg)) * Math.sin(phi) + Math.cos(Math.radians(dec_deg)) * Math.cos(phi) * Math.cos(Math.radians(hra_deg));
+            const alt_deg = Math.degrees(Math.asin(Math.max(-1, Math.min(1, sin_alt))));
+            
+            let az_deg = 0;
+            if (Math.cos(Math.radians(alt_deg)) !== 0) {
+                const cos_az = (Math.sin(Math.radians(dec_deg)) * Math.cos(phi) - Math.cos(Math.radians(dec_deg)) * Math.sin(phi) * Math.cos(Math.radians(hra_deg))) / Math.cos(Math.radians(alt_deg));
+                az_deg = Math.degrees(Math.acos(Math.max(-1, Math.min(1, cos_az))));
+                if (hra_deg > 0) az_deg = 360 - az_deg;
+            }
+            if(isNaN(az_deg)) az_deg = 0;
+            return { hra_deg, alt_deg, az_deg };
+        }
+
+        function getDNI(alt_deg) {
+            if (alt_deg <= 0) return 0;
+            const am = 1 / (Math.sin(Math.radians(alt_deg)) + 0.50572 * Math.pow(6.07995 + alt_deg, -1.6364));
+            const dni = 1353 * Math.pow(0.7, Math.pow(am, 0.678));
+            return Math.max(0, dni);
+        }
+
+        function calcPower(alt, az, tilt, pAz, dni) {
+            if (alt <= 0 || dni <= 0) return 0;
+            const a = Math.radians(alt), b = Math.radians(tilt), ps = Math.radians(az), th = Math.radians(pAz);
+            return Math.max(0, dni * (Math.cos(a)*Math.sin(b)*Math.cos(ps-th) + Math.sin(a)*Math.cos(b)));
+        }
+
+        // ==========================================
+        // 3. Three.js Engine (3D Viewport)
+        // ==========================================
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0f172a);
+        
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth/container.clientHeight, 0.1, 1000);
+        camera.position.set(7, 6, 14);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+        
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Lighting
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1.4);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 1024;
+        sunLight.shadow.mapSize.height = 1024;
+        scene.add(sunLight);
+
+        // Ground setup - เปลี่ยนสีพื้นเป็นสีเขียวอ่อนและปรับกริด
+        const groundMat = new THREE.MeshStandardMaterial({
+            color: 0xa8e6cf, // Light Green color
+            roughness: 0.9,
+            metalness: 0.1
+        });
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), groundMat);
+        ground.rotation.x = -Math.PI/2; ground.receiveShadow = true;
+        scene.add(ground);
+        
+        // Grid Helper - เปลี่ยนสีให้กลมกลืนกับพื้นเขียวอ่อน
+        const gridHelper = new THREE.GridHelper(30, 30, 0x059669, 0x6ee7b7);
+        gridHelper.position.y = 0.01; // ยกขึ้นนิดหน่อยเพื่อไม่ให้จมกับพื้น
+        scene.add(gridHelper);
+
+        // Panel Generator
+        function buildPanel(color) {
+            const g = new THREE.Group();
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.5), new THREE.MeshStandardMaterial({color: 0x475569}));
+            pole.position.y = 0.75; pole.castShadow=true; g.add(pole);
+            const pivot = new THREE.Group(); pivot.position.y = 1.5;
+            const board = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.2, 0.1), new THREE.MeshStandardMaterial({color: color, roughness: 0.2, metalness: 0.5}));
+            board.rotation.x = -Math.PI/2; board.castShadow = true;
+            pivot.add(board); g.add(pivot);
+            return { g, pivot };
+        }
+        
+        const staticSys = buildPanel(0x3b82f6); staticSys.g.position.set(-2.5, 0, 0); scene.add(staticSys.g);
+        const trackSys = buildPanel(0xf59e0b); trackSys.g.position.set(2.5, 0, 0); scene.add(trackSys.g);
+        
+        const sun = new THREE.Mesh(new THREE.SphereGeometry(0.6, 32, 32), new THREE.MeshBasicMaterial({color: 0xfde047}));
+        scene.add(sun);
+
+        // ==========================================
+        // 4. Chart.js Engine (Analytics)
+        // ==========================================
+        const ctxChart = document.getElementById('powerChart').getContext('2d');
+        const chart = new Chart(ctxChart, {
+            type: 'line',
+            data: {
+                labels: Array.from({length: 24}, (_, i) => i + ":00"),
+                datasets: [
+                    { label: 'Tracking (N-S Axis)', borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.15)', data: [], fill: true, tension: 0.4, pointRadius: 0 },
+                    { label: 'Fixed Module', borderColor: '#3b82f6', data: [], tension: 0.4, borderDash: [5, 5], pointRadius: 0 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                scales: { 
+                    y: { beginAtZero: true, max: 1050, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                    x: { grid: { display: false }, ticks: { color: '#94a3b8', maxTicksLimit: 12 } }
+                },
+                plugins: { legend: { position: 'top', align: 'end', labels: { color: '#f8fafc', boxWidth: 12 } } }
+            }
+        });
+
+        // ==========================================
+        // 5. System Controller
+        // ==========================================
+        const els = ['slide-lat', 'slide-lon', 'slide-time', 'slide-day', 'toggle-smart-fixed'].reduce((a, b) => ({...a, [b]: document.getElementById(b)}), {});
+
+        function updateSystem() {
+            const lat = parseFloat(els['slide-lat'].value), lon = parseFloat(els['slide-lon'].value);
+            const hour = parseFloat(els['slide-time'].value), day = parseInt(els['slide-day'].value);
+            const isSmartFixed = els['toggle-smart-fixed'].checked;
+
+            // --- Smart Fixed Logic ---
+            let currentFixedTilt = FIXED_TILT_THAI;
+            let currentFixedAz = FIXED_AZ_THAI;
+            let fixedLabelText = '15° S (Thai Std)';
+
+            if (isSmartFixed) {
+                currentFixedTilt = Math.abs(lat);
+                currentFixedAz = lat >= 0 ? 180 : 0;
+                fixedLabelText = `${currentFixedTilt.toFixed(1)}° ${lat >= 0 ? 'S' : 'N'} (Smart)`;
+            }
+
+            // Update UI
+            document.getElementById('label-p-static').innerText = `🟦 Fixed (${fixedLabelText})`;
+            document.getElementById('tag-fixed').innerText = `🟦 Fixed (${fixedLabelText})`;
+            
+            marker.setLatLng([lat, lon]); map.panTo([lat, lon]);
+            
+            document.getElementById('val-lat').innerText = lat.toFixed(2) + '°';
+            document.getElementById('val-lon').innerText = lon.toFixed(2) + '°';
+            document.getElementById('val-day').innerText = day;
+            document.getElementById('val-time').innerText = `${Math.floor(hour).toString().padStart(2,'0')}:${Math.floor((hour%1)*60).toString().padStart(2, '0')}`;
+
+            // Calculate Solar & Atmosphere
+            const m = calcSolar(lat, lon, day, hour);
+            const dni = getDNI(m.alt_deg);
+
+            document.getElementById('val-alt').innerText = m.alt_deg.toFixed(1) + '°';
+            document.getElementById('val-az').innerText = m.az_deg.toFixed(1) + '°';
+            document.getElementById('val-dni').innerText = dni.toFixed(1) + ' W/m²';
+
+            // 3D Sun Update
+            const sunR = 15;
+            const altR = Math.radians(m.alt_deg), azR = Math.radians(m.az_deg - 90);
+            sun.position.set(Math.cos(altR) * Math.cos(azR) * sunR, Math.sin(altR) * sunR, Math.cos(altR) * Math.sin(azR) * sunR);
+            sunLight.position.copy(sun.position);
+            
+            if(m.alt_deg > 0) {
+                sunLight.intensity = (dni / 1000) * 1.5; 
+                scene.background = new THREE.Color(0x0f172a); // Day Sky
+            } else {
+                sunLight.intensity = 0;
+                scene.background = new THREE.Color(0x020617); // Night Sky
+            }
+
+            // Panel Mechanics Update
+            staticSys.pivot.rotation.x = -Math.radians(currentFixedTilt); 
+            staticSys.pivot.rotation.y = Math.radians(currentFixedAz);
+            
+            const trkHRA = m.alt_deg > 0 ? Math.max(-60, Math.min(60, m.hra_deg)) : 0;
+            trackSys.pivot.rotation.z = -Math.radians(trkHRA); 
+            trackSys.pivot.rotation.y = Math.PI; // Face South Axis
+
+            // Real-time Power Output
+            const pS = calcPower(m.alt_deg, m.az_deg, currentFixedTilt, currentFixedAz, dni);
+            const pT = calcPower(m.alt_deg, m.az_deg, Math.abs(trkHRA), trkHRA > 0 ? 270 : 90, dni);
+            document.getElementById('val-p-static').innerText = pS.toFixed(0) + ' W/m²';
+            document.getElementById('val-p-track').innerText = pT.toFixed(0) + ' W/m²';
+
+            // Integral over 24h for Energy Yield
+            let sumFixed = 0, sumTrack = 0;
+            const ds = [], dt = [];
+            for(let i=0; i<24; i++) {
+                const sm = calcSolar(lat, lon, day, i);
+                const s_dni = getDNI(sm.alt_deg);
+                const th = sm.alt_deg > 0 ? Math.max(-60, Math.min(60, sm.hra_deg)) : 0;
+                
+                const pf_hour = calcPower(sm.alt_deg, sm.az_deg, currentFixedTilt, currentFixedAz, s_dni);
+                const pt_hour = calcPower(sm.alt_deg, sm.az_deg, Math.abs(th), th > 0 ? 270 : 90, s_dni);
+                
+                ds.push(pf_hour);
+                dt.push(pt_hour);
+                sumFixed += pf_hour;
+                sumTrack += pt_hour;
+            }
+            chart.data.datasets[0].data = dt; chart.data.datasets[1].data = ds; chart.update('none');
+
+            document.getElementById('val-e-static').innerText = sumFixed.toFixed(0) + ' Wh/m²';
+            document.getElementById('val-e-track').innerText = sumTrack.toFixed(0) + ' Wh/m²';
+            
+            const gain = sumFixed > 0 ? ((sumTrack - sumFixed) / sumFixed) * 100 : 0;
+            document.getElementById('val-gain').innerText = '+' + gain.toFixed(1) + '%';
+        }
+
+        // Event Listeners
+        Object.values(els).forEach(el => el.addEventListener('input', updateSystem));
+        
+        document.getElementById('slide-lat').addEventListener('change', (e) => fetchLocationName(e.target.value, els['slide-lon'].value));
+        document.getElementById('slide-lon').addEventListener('change', (e) => fetchLocationName(els['slide-lat'].value, e.target.value));
+
+        // Render Loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update(); 
+            renderer.render(scene, camera);
+            
+            // Sync Compass HUD
+            const camDir = new THREE.Vector3(); 
+            camera.getWorldDirection(camDir);
+            document.getElementById('compass-hud').style.transform = `rotate(${Math.atan2(camDir.x, camDir.z)*180/Math.PI}deg)`;
+        }
+        
+        // Initialization
+        updateSystem(); 
+        animate();
+
+        window.addEventListener('resize', () => { 
+            camera.aspect = container.clientWidth / container.clientHeight; 
+            camera.updateProjectionMatrix(); 
+            renderer.setSize(container.clientWidth, container.clientHeight); 
+            map.invalidateSize(); 
+        });
+    </script>
+</body>
+</html>
